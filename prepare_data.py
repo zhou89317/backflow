@@ -2,10 +2,28 @@ import datetime
 import pandas_datareader.data as web
 import pandas as pd
 import talib as tb
+import os
 
-pd.set_option('display.max_rows', 100)
 
-def readdata(stocknameabrev, enddatetime):
+def getlastweekdate():
+    """
+    get the last week day
+    :return: a datetime instance representing the last weekday
+    """
+    now = datetime.date.today()
+    result_date = now
+    if now.isoweekday() == 1:
+        result_date = now - datetime.timedelta(3)
+    elif now.isoweekday() == 7:
+        result_date = now - datetime.timedelta(2)
+    else:
+        result_date = now - datetime.timedelta(1)
+
+    return result_date
+
+
+
+def readdata(stocknameabrev):
     """
     API KEY(Quandl): Jaq5cjYcrvukouwWEqwA
     :param: stocknameabrev: a string represents a stock in American stock exchanges e.g 'AAPL.US'
@@ -16,10 +34,18 @@ def readdata(stocknameabrev, enddatetime):
               Note that the three Dataframes returned are in the same time range.
     """
     start = datetime.datetime(2010, 1, 4)
-    end = enddatetime
-    df = web.DataReader(stocknameabrev, 'stooq',start = start, end = end)
-    df_sp500 = web.DataReader('^SPX', 'stooq', start = start, end = end)
-    df_nasdaq = web.DataReader('^NDQ', 'stooq', start = start, end = end)
+    end = getlastweekdate()
+    if os.path.exists('df.csv') and os.path.exists('df_sp500.csv') and os.path.exists('df_nasdaq.csv'):
+        df = pd.read_csv('df.csv', index_col='Date',parse_dates=['Date'])
+        df_sp500 = pd.read_csv('df_sp500.csv',index_col='Date',parse_dates=['Date'])
+        df_nasdaq = pd.read_csv('df_nasdaq.csv',index_col='Date',parse_dates=['Date'])
+    else:
+        df = web.DataReader(stocknameabrev, 'stooq',start = start, end = end)
+        df_sp500 = web.DataReader('^SPX', 'stooq', start = start, end = end)
+        df_nasdaq = web.DataReader('^NDQ', 'stooq', start = start, end = end)
+        df.to_csv('df.csv')
+        df_sp500.to_csv('df_sp500.csv')
+        df_nasdaq.to_csv('df_nasdaq.csv')
 
     list1 = list(df.index)
     list2 = list(df_nasdaq.index)
@@ -281,8 +307,6 @@ def integratedframes(df_poped, df_nasdaq_poped,df_sp500_poped):
         concatenated_nadropped = concatenated.dropna(axis = 0, how='any')
         return concatenated_nadropped
 
-concatenated = integratedframes(df_poped, df_nasdaq_poped,df_sp500_poped)
-print(concatenated)
 
 def labelling(concatenated_df, ndays):
     """
@@ -306,3 +330,19 @@ def labelling(concatenated_df, ndays):
     final_df = final_df.drop(['SMA'],axis = 1)
     final_df = final_df.iloc[:(concatenated_df.shape[0] - ndays), :]
     return final_df
+
+
+
+def prepare_data(stocknameabrev, ndays):
+    """
+        API KEY(Quandl): Jaq5cjYcrvukouwWEqwA
+        perform everything in module prepare_data
+        :param: stocknameabrev: a string represents a stock in American stock exchanges e.g 'AAPL.US'
+        :param: enddatetime: a datetime instance represents the last trading day we want to fetch data
+        :return: a dataframe ready for feature selection.
+    """
+    df, df_nasdaq, df_sp500 = readdata(stocknameabrev)
+    df_poped, df_nasdaq_poped, df_sp500_poped = popfeatures(df, df_nasdaq, df_sp500, ndays=ndays)
+    concatenated = integratedframes(df_poped, df_nasdaq_poped, df_sp500_poped)
+    finaldf = labelling(concatenated, ndays=ndays)
+    return finaldf

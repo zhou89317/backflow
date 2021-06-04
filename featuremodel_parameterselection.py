@@ -1,5 +1,5 @@
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
-from prepare_data import prepare_data
+from prepare_data import *
 from sklearn.ensemble import ExtraTreesClassifier,GradientBoostingClassifier
 import numpy as np
 from sklearn.preprocessing import StandardScaler,MinMaxScaler
@@ -8,7 +8,8 @@ import pandas as pd
 pd.set_option('display.max_rows', 100)
 pd.set_option('display.max_columns', 100)
 
-finaldf = prepare_data('AAPL.US', 5)
+finaldf = prepare_data(STOCK_CODE, NDAYS_LOOKAHEAD)
+# TODO: 换股票预测调这里
 X = finaldf.iloc[:,:-1]
 y = finaldf.iloc[:,-1]
 scalar = MinMaxScaler()
@@ -16,10 +17,10 @@ scalar.fit(X)
 X = scalar.transform(X)
 
 
-paramgrid = {"n_estimators": [250,300,350,400,450,500],
+paramgrid = {"n_estimators": [250,300,350,400,450,500,600,800],
              "criterion"     : ['gini','entropy'],
              "max_depth" : [None, 6,7,8,9,10],
-             'min_samples_split' : [80,85,90,95,100],
+             'min_samples_split' : [80,90,95,100,150,180,200],
              }
 
 
@@ -36,5 +37,4 @@ def show_featureimportance():
     best = cv.best_estimator_
     bestscore = cv.best_score_
     print(best, bestscore)
-    print(type(best.feature_importances_))
     return best.feature_importances_

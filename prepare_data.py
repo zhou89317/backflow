@@ -4,6 +4,8 @@ import pandas as pd
 import talib as tb
 import os
 
+STOCK_CODE = 'AMZN.US'
+NDAYS_LOOKAHEAD = 7
 
 def getlastweekdate():
     """
@@ -33,9 +35,10 @@ def readdata(stocknameabrev):
               a Dataframe of sp500 index
               Note that the three Dataframes returned are in the same time range.
     """
-    start = datetime.datetime(2010, 1, 4)
+    start = datetime.datetime(1998, 1, 1)
     end = getlastweekdate()
     if os.path.exists('df.csv') and os.path.exists('df_sp500.csv') and os.path.exists('df_nasdaq.csv'):
+
         df = pd.read_csv('df.csv', index_col='Date',parse_dates=['Date'])
         df_sp500 = pd.read_csv('df_sp500.csv',index_col='Date',parse_dates=['Date'])
         df_nasdaq = pd.read_csv('df_nasdaq.csv',index_col='Date',parse_dates=['Date'])
@@ -60,7 +63,7 @@ def readdata(stocknameabrev):
     return df, df_nasdaq, df_sp500
 
 
-def popfeatures(df, df_nasdaq, df_sp500, ndays):
+def popfeatures(df, df_nasdaq, df_sp500, ndays=NDAYS_LOOKAHEAD):
     """
     :param df: df returned from function def readdata(stocknameabrev):
     :param df_nasdaq: df_nasdaq returned from function def readdata(stocknameabrev)
@@ -308,7 +311,7 @@ def integratedframes(df_poped, df_nasdaq_poped,df_sp500_poped):
         return concatenated_nadropped
 
 
-def labelling(concatenated_df, ndays):
+def labelling(concatenated_df, ndays=NDAYS_LOOKAHEAD):
     """
     Label the concatenated_df according to the following rules:
     Y(t) = 1 if SMA(t+3)>SMA(t); Y(t) = -1 if SMA(t+3) < Price(t)  (assume we want to predict the 3 days look-ahead
@@ -328,6 +331,7 @@ def labelling(concatenated_df, ndays):
 
     final_df = concatenated_df.dropna(axis = 0, how='any')
     final_df = final_df.drop(['SMA'],axis = 1)
+    #TODO: 真实预测的时候这里最近几天的数据要加上，别删了，测试模型的时候必须要label所以暂时删了
     final_df = final_df.iloc[:(concatenated_df.shape[0] - ndays), :]
     return final_df
 

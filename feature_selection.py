@@ -1,4 +1,4 @@
-from prepare_data import prepare_data
+from prepare_data import *
 import datetime
 from sktime.forecasting.model_selection import temporal_train_test_split
 from sklearn.preprocessing import StandardScaler,MinMaxScaler
@@ -12,7 +12,7 @@ def traintestsplit_standardization():
     :param finaldf: the df computed from function prepare_data(stocknameabrev, enddatetime, ndays):
     :return: X_train, X_test, y_train, y_test (X_train and X_test are all standardized version ndarray)
     """
-    finaldf = prepare_data('AAPL.US',5)
+    finaldf = prepare_data(STOCK_CODE,NDAYS_LOOKAHEAD)
     # note this excludes the index column
     X = finaldf.iloc[:,:-1]
     y = finaldf.iloc[:,-1]
@@ -53,12 +53,11 @@ def preparedata_forSVM():
     feature_importance = list(show_featureimportance())
     X_train, X_test, y_train, y_test = traintestsplit()
     sortedimportance_originalindex = sorted(enumerate(feature_importance), key=lambda x:x[1], reverse=True)
-    print(list(sortedimportance_originalindex))
 
     i = 0
     total_feature_importance = 0
     for count,num in sortedimportance_originalindex:
-        if total_feature_importance < 0.90:
+        if total_feature_importance < 0.95:
             total_feature_importance += num
             i += 1
 
@@ -72,7 +71,7 @@ def preparedata_forSVM():
     X_test = X_test.iloc[:, columns_iloc]
     return X_train, X_test, y_train, y_test
 
-print(preparedata_forSVM())
+
 
 
 

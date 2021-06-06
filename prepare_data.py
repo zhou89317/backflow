@@ -4,8 +4,8 @@ import pandas as pd
 import talib as tb
 import os
 
-STOCK_CODE = 'AMZN.US'
-NDAYS_LOOKAHEAD = 7
+STOCK_CODE = 'NVDA.US'
+NDAYS_LOOKAHEAD = 5
 
 def getlastweekdate():
     """
@@ -35,7 +35,7 @@ def readdata(stocknameabrev):
               a Dataframe of sp500 index
               Note that the three Dataframes returned are in the same time range.
     """
-    start = datetime.datetime(1998, 1, 1)
+    start = datetime.datetime(2005, 1, 1)
     end = getlastweekdate()
     if os.path.exists('df.csv') and os.path.exists('df_sp500.csv') and os.path.exists('df_nasdaq.csv'):
 
@@ -46,20 +46,22 @@ def readdata(stocknameabrev):
         df = web.DataReader(stocknameabrev, 'stooq',start = start, end = end)
         df_sp500 = web.DataReader('^SPX', 'stooq', start = start, end = end)
         df_nasdaq = web.DataReader('^NDQ', 'stooq', start = start, end = end)
+        df.fillna(method='bfill',inplace=True)
+        list1 = list(df.index)
+        list2 = list(df_nasdaq.index)
+        if len(list2) > len(list1):
+            for date in list1:
+                list2.remove(date)
+
+        df_nasdaq.drop(list2, inplace=True)
+        df = df.iloc[::-1]
+        df_sp500 = df_sp500.iloc[::-1]
+        df_nasdaq = df_nasdaq.iloc[::-1]
+        print(df.info)
         df.to_csv('df.csv')
         df_sp500.to_csv('df_sp500.csv')
         df_nasdaq.to_csv('df_nasdaq.csv')
 
-    list1 = list(df.index)
-    list2 = list(df_nasdaq.index)
-    if len(list2) > len(list1):
-        for date in list1:
-            list2.remove(date)
-
-    df_nasdaq.drop(list2, inplace=True)
-    df = df.iloc[::-1]
-    df_sp500 = df_sp500.iloc[::-1]
-    df_nasdaq = df_nasdaq.iloc[::-1]
     return df, df_nasdaq, df_sp500
 
 
@@ -283,6 +285,8 @@ def popfeatures(df, df_nasdaq, df_sp500, ndays=NDAYS_LOOKAHEAD):
     # add SMA - helper column for function labelling
     SMA_numpy_df = tb.SMA(df['Close'].to_numpy(), timeperiod=ndays)
     df['SMA'] = SMA_numpy_df
+    
+    df.to_csv('df_popedfeatures.csv')
     return df, df_nasdaq,df_sp500
 
 
@@ -304,6 +308,7 @@ def integratedframes(df_poped, df_nasdaq_poped,df_sp500_poped):
     dfsp500_dropped = df_sp500_poped.drop(df_sp500_dropcolumns, axis=1)
     try:
         concatenated = pd.concat([pd.concat([df_dropped, dfnasdaq_deopped], axis=1), dfsp500_dropped], axis=1)
+
     except AttributeError:
         print("check whether the shape of three dataframes match!")
     else:
@@ -314,7 +319,7 @@ def integratedframes(df_poped, df_nasdaq_poped,df_sp500_poped):
 def labelling(concatenated_df, ndays=NDAYS_LOOKAHEAD):
     """
     Label the concatenated_df according to the following rules:
-    Y(t) = 1 if SMA(t+3)>SMA(t); Y(t) = -1 if SMA(t+3) < Price(t)  (assume we want to predict the 3 days look-ahead
+    Y(t) = 1 if SMA(t+3)>SMA(t); Y(t) = -1 if SMA(t+3) < Price(t)  (assume we want to predict the (ndays) days look-ahead
     trend for the stock)
     :param concatenated_df: the df calculated from function integratedframes
     :param ndays: an integer representing how many days look-ahead we want to predict
@@ -337,6 +342,31 @@ def labelling(concatenated_df, ndays=NDAYS_LOOKAHEAD):
 
 
 
+def labelling_realtime(concatenated_df,ndays=NDAYS_LOOKAHEAD):
+    """
+    Label the concatenated_df according to the following rules:
+    Y(t) = 1 if SMA(t+3)>SMA(t); Y(t) = -1 if SMA(t+3) < Price(t) (assume we want to predict the (ndays, here is 3) days look-ahead
+    trend for the stock)
+    :param concatenated_df: the df calculated from function integratedframes
+    :param ndays: an integer representing how many days look-ahead we want to predict
+    :return: the final labeled dataframe ready for feature selection (note that the only difference between this function and
+    function labelling is that this one does not delete the last (ndays) rows from the resulting dataframe due to
+    our prediction method. If we delete those, this function will be exactly the same as function labelling.)
+    """
+    concatenated_df['label'] = 0
+    for i in range(concatenated_df.shape[0]):
+        timestampList = list(concatenated_df.index)
+        if (i + ndays < concatenated_df.shape[0]):
+            starttime = str(timestampList[i])[0:10]
+            endtime = str(timestampList[i + ndays])[0:10]
+            if (concatenated_df.loc[endtime, 'SMA'] > concatenated_df.loc[starttime, 'SMA']):
+                concatenated_df.loc[starttime, 'label'] = 1
+
+    final_df = concatenated_df.dropna(axis=0, how='any')
+    final_df = final_df.drop(['SMA'], axis=1)
+    return final_df
+
+
 def prepare_data(stocknameabrev, ndays):
     """
         API KEY(Quandl): Jaq5cjYcrvukouwWEqwA
@@ -349,4 +379,20 @@ def prepare_data(stocknameabrev, ndays):
     df_poped, df_nasdaq_poped, df_sp500_poped = popfeatures(df, df_nasdaq, df_sp500, ndays=ndays)
     concatenated = integratedframes(df_poped, df_nasdaq_poped, df_sp500_poped)
     finaldf = labelling(concatenated, ndays=ndays)
+    return finaldf
+
+
+
+def prepare_data_realtime(stocknameabrev, ndays=NDAYS_LOOKAHEAD):
+    """
+        API KEY(Quandl): Jaq5cjYcrvukouwWEqwA
+        perform everything in module prepare_data
+        :param: stocknameabrev: a string represents a stock in American stock exchanges e.g 'AAPL.US'
+        :param: enddatetime: a datetime instance represents the last trading day we want to fetch data
+        :return: a dataframe for real time prediction.
+    """
+    df, df_nasdaq, df_sp500 = readdata(stocknameabrev)
+    df_poped, df_nasdaq_poped, df_sp500_poped = popfeatures(df, df_nasdaq, df_sp500, ndays=ndays)
+    concatenated = integratedframes(df_poped, df_nasdaq_poped, df_sp500_poped)
+    finaldf = labelling_realtime(concatenated, ndays=ndays)
     return finaldf

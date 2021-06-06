@@ -34,7 +34,7 @@ def traintestsplit():
         :param finaldf: the df computed from function prepare_data(stocknameabrev, enddatetime, ndays):
         :return: X_train, X_test, y_train, y_test (X_train and X_test are all unstandardized version Dataframe)
         """
-    finaldf = prepare_data('AAPL.US',5)
+    finaldf = prepare_data(STOCK_CODE,NDAYS_LOOKAHEAD)
     # note this excludes the index column
     X = finaldf.iloc[:, :-1]
     y = finaldf.iloc[:, -1]
@@ -60,6 +60,8 @@ def preparedata_forSVM():
         if total_feature_importance < 0.95:
             total_feature_importance += num
             i += 1
+        else:
+            break
 
 
     columns_iloc = []
@@ -69,10 +71,39 @@ def preparedata_forSVM():
     columns_iloc = sorted(columns_iloc)
     X_train = X_train.iloc[:, columns_iloc]
     X_test = X_test.iloc[:, columns_iloc]
-    return X_train, X_test, y_train, y_test
+    return X_train, X_test, y_train, y_test,columns_iloc
 
 
 
+def apply_selectfeatures_realtime(X_train, X_test, y_train):
+    """
+    apply feature selection for data that is used for final prediction, only the last ndays data will be used for
+    label prediction.
+    :param X_train: training data for the final prediction, this is essentially all data except the last ndays ones
+    :param X_test: this is just the last ndays data samples
+    :param y_train: training labels for final prediction, this is essentially all labels except the last ndays labels
+    :return:
+    """
+    feature_importance = list(show_featureimportance())
+    sortedimportance_originalindex = sorted(enumerate(feature_importance), key=lambda x: x[1], reverse=True)
+
+    i = 0
+    total_feature_importance = 0
+    for count, num in sortedimportance_originalindex:
+        if total_feature_importance < 0.95:
+            total_feature_importance += num
+            i += 1
+        else:
+            break
+
+    columns_iloc = []
+    enumerate_chosen_features = list(sortedimportance_originalindex)[:i]
+    for item in enumerate_chosen_features:
+        columns_iloc.append(item[0])
+    columns_iloc = sorted(columns_iloc)
+    X_train = X_train.iloc[:, columns_iloc]
+    X_test = X_test.iloc[:, columns_iloc]
+    return X_train, X_test, y_train
 
 
 

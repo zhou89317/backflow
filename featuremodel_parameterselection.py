@@ -9,7 +9,6 @@ pd.set_option('display.max_rows', 100)
 pd.set_option('display.max_columns', 100)
 
 finaldf = prepare_data(STOCK_CODE, NDAYS_LOOKAHEAD)
-# TODO: 换股票预测调这里
 X = finaldf.iloc[:,:-1]
 y = finaldf.iloc[:,-1]
 scalar = MinMaxScaler()
@@ -17,10 +16,10 @@ scalar.fit(X)
 X = scalar.transform(X)
 
 
-paramgrid = {"n_estimators": [250,300,350,400,450,500,600,800],
+paramgrid = {"n_estimators": [150,250,350,400,450,500,600],
              "criterion"     : ['gini','entropy'],
-             "max_depth" : [None, 6,7,8,9,10],
-             'min_samples_split' : [80,90,95,100,150,180,200],
+             "max_depth" : [1,2,3,4,5,6,7,8,9,10],
+             'min_samples_split' : [80,90,100,150,180,190,200],
              }
 
 
